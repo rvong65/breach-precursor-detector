@@ -1,0 +1,10 @@
+{
+  "score_threshold": -2.7755575615628914e-17,
+  "risk_level_bounds": {
+    "Critical": 0.02,
+    "High": 0.05,
+    "Medium": 0.1,
+    "Low": 0.2
+  },
+  "strong_indicator_definition": "suspicious_parent == 1 OR dump_precursor == 1 OR hidden_flags >= 2"
+}

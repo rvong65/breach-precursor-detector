@@ -1,0 +1,8 @@
+# Python caches 
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+my_project_env/
+data/
+tests/
