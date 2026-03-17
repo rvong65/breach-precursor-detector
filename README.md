@@ -75,6 +75,11 @@ flowchart LR
 **Demo video**  
 *Coming Soon*
 
+**Live app:** [https://breach-precursor-detector.streamlit.app/](https://breach-precursor-detector.streamlit.app/)
+(Desktop browser recommended)
+
+**Important note:** The app currently looks best in **Light mode**. If the text is hard to read in dark mode, please switch your browser/system theme to light (or use Streamlit's theme selector in the top-right menu if available). This is a known rendering quirk we're working on improving.
+
 **Run locally**  
 From the project root: `streamlit run app.py`. If `output/scored_events_gated.parquet` exists, use **Load sample data** in the sidebar to load it without re-running the pipeline.
 
