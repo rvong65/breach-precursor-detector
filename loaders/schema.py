@@ -19,6 +19,13 @@ UNIFIED_COLUMNS = [
 OPTIONAL_UNIFIED = ["target_image", "target_pid"]
 
 
+def _col_series(df: pd.DataFrame, col: str) -> pd.Series:
+    """Return column as Series, or NaN-filled Series if column is absent."""
+    if col in df.columns:
+        return df[col]
+    return pd.Series(pd.NA, index=df.index)
+
+
 def _parse_hex_id(value: str | None) -> int | None:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
@@ -112,15 +119,24 @@ def normalize_sysmon(df: pd.DataFrame) -> pd.DataFrame:
 
     # EventID 1: process create -> Image, ParentImage, ProcessId, ParentProcessId, CommandLine
     # EventID 10/8: SourceImage, SourceProcessId, TargetImage, TargetProcessId
-    process_image = df.get("Image").fillna(df.get("SourceImage"))
+    image_col = df.get("Image")
+    source_col = df.get("SourceImage")
+    if image_col is None and source_col is None:
+        process_image = None
+    elif image_col is None:
+        process_image = source_col
+    elif source_col is None:
+        process_image = image_col
+    else:
+        process_image = image_col.fillna(source_col)
     parent_image = df.get("ParentImage")  # only for event 1
     command_line = df.get("CommandLine")
-    pid = pd.to_numeric(df.get("ProcessId"), errors="coerce").fillna(
-        pd.to_numeric(df.get("SourceProcessId"), errors="coerce")
+    pid = pd.to_numeric(_col_series(df, "ProcessId"), errors="coerce").fillna(
+        pd.to_numeric(_col_series(df, "SourceProcessId"), errors="coerce")
     )
-    ppid = pd.to_numeric(df.get("ParentProcessId"), errors="coerce")
+    ppid = pd.to_numeric(_col_series(df, "ParentProcessId"), errors="coerce")
     target_image = df.get("TargetImage")
-    target_pid = pd.to_numeric(df.get("TargetProcessId"), errors="coerce")
+    target_pid = pd.to_numeric(_col_series(df, "TargetProcessId"), errors="coerce")
 
     out = pd.DataFrame(
         {

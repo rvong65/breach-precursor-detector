@@ -401,7 +401,7 @@ def load_uploaded_file(file_name: str, file_size: int, content: bytes) -> Option
     df = _normalize_schema(df)
 
     # Lightweight structural validation for uploaded scored events.
-    required_upload_cols = ["timestamp", "image", "parent_image", "command_line", "pid", "ppid", "event_type"]
+    required_upload_cols = ["timestamp", "process_image", "parent_image", "command_line", "pid", "ppid", "event_type"]
     missing = [c for c in required_upload_cols if c not in df.columns]
     if missing:
         return None
@@ -516,7 +516,7 @@ def main():
             if df_loaded is None:
                 # Missing required columns or type issues.
                 st.error(
-                    "The uploaded file is missing required columns (timestamp, image, parent_image, command_line, pid, ppid, event_type) "
+                    "The uploaded file is missing required columns (timestamp, process_image or image, parent_image, command_line, pid, ppid, event_type) "
                     "or has incompatible types. Please use a file in the expected format."
                 )
                 st.stop()

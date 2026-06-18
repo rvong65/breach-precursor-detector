@@ -1,8 +1,28 @@
-# Python caches 
+# -----------------------------------------------------------------------------
+# Python — bytecode and caches
+# -----------------------------------------------------------------------------
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 *.pyo
 *.pyd
+
+# Pytest / test runner caches (regenerated locally and in CI)
+.pytest_cache/
+pytest-cache-files-*/
+
+# -----------------------------------------------------------------------------
+# Local environment
+# -----------------------------------------------------------------------------
 my_project_env/
+
+# -----------------------------------------------------------------------------
+# Project data (not committed — download Splunk Attack Data separately)
+# See README → Data Sources & Attribution
+# -----------------------------------------------------------------------------
 data/
-tests/
+
+# -----------------------------------------------------------------------------
+# Manual upload QA fixtures (local only — CI uses in-memory invalid inputs)
+# -----------------------------------------------------------------------------
+tests/broken_files/

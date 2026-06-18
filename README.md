@@ -24,6 +24,7 @@ Interpretability and human oversight are built in. Confidence gating ensures we 
 ![Seaborn](https://img.shields.io/badge/seaborn-%23ff6f61.svg?style=for-the-badge)
 ![PyArrow](https://img.shields.io/badge/PyArrow-%23FF9900?style=for-the-badge)
 ![Streamlit](https://img.shields.io/badge/Streamlit-%23FF4B4B.svg?style=for-the-badge&logo=streamlit&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 
 ---
 
@@ -48,44 +49,107 @@ Full original license: [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 
 ## 🏗️ Architecture & Design Choices
 
-**Pipeline flow:** Raw logs (CrowdStrike Falcon NDJSON, Windows Security 4688 and Sysmon XML) are loaded and parsed ([load_events.py](load_events.py), [loaders/](loaders/)) into a unified schema (timestamp, process_image, parent_image, command_line, pid, ppid, etc.). Events are prepped and passed through feature engineering ([feature_engineering.py](feature_engineering.py)), which produces 12 interpretable features (e.g. suspicious parent, unusual parent–child chain score, command-line entropy, dump-precursor keywords, hidden/encoding flags, LOLBAS ratio, process-tree depth, Sysmon access patterns). An **Isolation Forest** is trained on the feature matrix ([train_isolation_forest.py](train_isolation_forest.py)); each event is scored and trace columns are merged. Confidence gating ([confidence_gating.py](confidence_gating.py)) assigns risk levels from score percentiles, defines a *strong indicator* (suspicious parent, dump precursor, or multiple hidden flags), and sets **flagged** only when the score is below threshold *and* strong indicator is true. Human-readable explanations are generated for every flagged row. The **Streamlit** dashboard ([app.py](app.py)) lets users upload or load sample scored data, filter by risk and keyword, sort, and download results.
-
 ```mermaid
-flowchart LR
-  Raw[Raw logs]
-  Load[load_events + loaders]
-  Feat[feature_engineering]
-  Train[train_isolation_forest]
-  Gate[confidence_gating]
-  App[Streamlit app]
-  Raw --> Load --> Feat --> Train --> Gate --> App
+flowchart TB
+    subgraph Client["Client Layer"]
+        U[Analyst / Demo user]
+        UI[Streamlit UI<br/>app.py]
+    end
+
+    subgraph Ingest["Ingestion Layer — load_events.py + loaders/"]
+        RAW[Falcon NDJSON · Sysmon XML · 4688 XML]
+        LOAD[Per-source parsers<br/>falcon · sysmon · windows_security_4688]
+        SCHEMA[Unified schema<br/>loaders/schema.py]
+    end
+
+    subgraph Features["Feature Layer — feature_engineering.py"]
+        PREP[Event prep<br/>paths · pid/ppid · completeness]
+        FEAT[12 interpretable features<br/>entropy · LOLBAS · dump keywords]
+        LABEL[Heuristic labels<br/>is_attack — eval only]
+    end
+
+    subgraph Model["Model Layer — train_isolation_forest.py"]
+        IF[Isolation Forest<br/>contamination 0.05 · 150 estimators]
+        SCORE[anomaly_score · is_anomaly]
+    end
+
+    subgraph Gating["Gating Layer — confidence_gating.py"]
+        RISK[risk_level<br/>percentile bands]
+        STRONG[strong_indicator<br/>parent · dump · hidden flags]
+        FLAG[flagged = low score AND indicator]
+        EXP[Human-readable explanations]
+    end
+
+    subgraph Artifacts["Artifact Layer — output/"]
+        PARQ[Parquet artifacts<br/>X_features · scored_events_gated]
+        CFG[threshold_config.json]
+    end
+
+    subgraph Guard["Safety Layer — app.py"]
+        VAL[Upload validation<br/>extension · schema · types]
+        TRIAGE[Flagged-only triage<br/>filters · sort · CSV export]
+    end
+
+    U --> UI
+    UI --> VAL
+    VAL -->|sample / valid upload| TRIAGE
+    VAL -->|invalid / empty| UI
+    RAW --> LOAD --> SCHEMA --> PREP --> FEAT
+    FEAT --> LABEL
+    FEAT --> IF
+    IF --> SCORE
+    SCORE --> RISK
+    FEAT --> STRONG
+    RISK --> FLAG
+    STRONG --> FLAG
+    FLAG --> EXP
+    EXP --> PARQ
+    RISK --> CFG
+    PARQ --> UI
+    CFG --> UI
+    TRIAGE --> UI
 ```
+
+**Pipeline summary:** Raw logs (CrowdStrike Falcon NDJSON, Windows Security 4688 and Sysmon XML) are loaded and parsed ([load_events.py](load_events.py), [loaders/](loaders/)) into a unified schema (timestamp, process_image, parent_image, command_line, pid, ppid, etc.). Events are prepped and passed through feature engineering ([feature_engineering.py](feature_engineering.py)), which produces 12 interpretable features (e.g. suspicious parent, unusual parent–child chain score, command-line entropy, dump-precursor keywords, hidden/encoding flags, LOLBAS ratio, process-tree depth, Sysmon access patterns). An **Isolation Forest** is trained on the feature matrix ([train_isolation_forest.py](train_isolation_forest.py)); each event is scored and trace columns are merged. Confidence gating ([confidence_gating.py](confidence_gating.py)) assigns risk levels from score percentiles, defines a *strong indicator* (suspicious parent, dump precursor, or multiple hidden flags), and sets **flagged** only when the score is below threshold *and* strong indicator is true. Human-readable explanations are generated for every flagged row. The **Streamlit** dashboard ([app.py](app.py)) lets users upload or load sample scored data, filter by risk and keyword, sort, and download results.
 
 **Key design decisions:**
 
-- **Unsupervised learning** — Isolation Forest fits real-world settings where labeled attack data is scarce; we use heuristic labels only for evaluation and feature analysis.
+- **Unsupervised learning** — Isolation Forest fits real-world settings where labeled attack data is scarce; heuristic labels are used only for evaluation and feature analysis.
 - **Interpretable features** — All 12 features are explainable (parent–child rules, entropy, keywords, LOLBAS, etc.), so analysts can understand why an event was scored or flagged.
 - **Confidence gating** — Flag only when anomaly score is below threshold *and* at least one strong indicator (suspicious parent, dump precursor, or ≥2 hidden flags) is present, to reduce false positives.
 - **Reproducibility** — Pipeline outputs parquet artifacts and a threshold config (JSON) so runs are auditable and tunable.
+
+### Development Journey
+
+```mermaid
+flowchart LR
+    A[Multi-source log ingest<br/>Falcon · Sysmon · 4688] --> B[Feature engineering<br/>12 interpretable features]
+    B --> C[Isolation Forest<br/>unsupervised scoring]
+    C --> D[Confidence gating<br/>risk + explanations]
+    D --> E[Streamlit UI<br/>SOC theme + triage]
+    E --> F[Upload validation<br/>schema + type checks]
+    F --> G[Sample parquet workflow<br/>reproducible artifacts]
+    G --> H[Streamlit Cloud deploy<br/>MVP]
+    H --> I[GitHub Actions CI<br/>offline tests]
+```
 
 ---
 
 ## 🚀 Demo
 
-**Demo video**  
-*Coming Soon*
+**[▶ Open the live app on Streamlit Cloud](https://breach-precursor-detector.streamlit.app/)** (Desktop browser recommended)
 
-**Live app:** [https://breach-precursor-detector.streamlit.app/](https://breach-precursor-detector.streamlit.app/)
-(Desktop browser recommended)
-
-**Important note:** The app currently looks best in **Light mode**. If the text is hard to read in dark mode, please switch your browser/system theme to light (or use Streamlit's theme selector in the top-right menu if available). This is a known rendering quirk we're working on improving.
+**Before you open the app**
+- **Cold start:** This app runs on Streamlit Community Cloud and may go to sleep after inactivity. If you see **“Zzzz — This app has gone to sleep due to inactivity”**, click **“Yes, get this app back up!”** to wake it — anyone can do this; you don’t need to contact the maintainer. Startup may take a minute after you click.
+- **Display:** The app looks best in **light mode**. If text is hard to read in dark mode, switch your browser/system theme or use Streamlit’s theme selector in the top-right menu. This is a known rendering quirk we're working on improving.
 
 **Run locally**  
 From the project root: `streamlit run app.py`. If `output/scored_events_gated.parquet` exists, use **Load sample data** in the sidebar to load it without re-running the pipeline.
 
 **Screenshot** 
 
-![Home screen](screenshots/01-home.png)
+![Home screen](docs/screenshots/01-home.png)
+
 ---
 
 ## Quick Start
@@ -114,29 +178,115 @@ streamlit run app.py
 
 Then use **Load sample data** to load `output/scored_events_gated.parquet`.
 
+**Run tests locally**
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -q
+```
+
 ---
 
-## Safety Considerations
+## ✨ Features
 
-Confidence gating and human-readable explanations are designed to reduce alert fatigue and enable analyst oversight. The system is intended to *support*, not replace, human judgment in security operations. Flagged events are suggestions for triage; final decisions and actions remain with the operator.
+- **Unsupervised Isolation Forest** — anomaly scoring on 12 interpretable process features without requiring labeled attack data for training
+- **Multi-source log ingestion** — Falcon NDJSON, Sysmon XML, and Windows 4688 parsed into one unified schema via [loaders/](loaders/)
+- **Confidence gating** — flags events only when a low anomaly score *and* a strong domain indicator (suspicious parent, dump precursor, or ≥2 hidden flags) align
+- **Human-readable explanations** — rule-based, SOC-friendly reason strings for every flagged event
+- **Risk level bands** — Critical / High / Medium / Low / Normal from anomaly-score percentiles
+- **Cybersecurity UI** — dark SOC theme, risk badges, How It Works sidebar, and sidebar summary charts
+- **Analyst triage** — flagged-only main table with risk-level and keyword filters, sortable columns, and full command-line expander
+- **CSV export** — download filtered flagged events; threshold config available when present in `output/`
+- **Upload validation** — `.csv` / `.parquet` extension checks, required-column validation, and friendly error messages (no raw tracebacks)
+- **Sample data workflow** — one-click load of pre-scored gated parquet for demos without re-running the pipeline
+
+---
+
+## 🛡️ Safety Considerations
+
+| Principle | Implementation |
+|-----------|----------------|
+| Read-only operations | No blocking, quarantine, endpoint response, or exploitation tooling — triage and export only |
+| Human-in-the-loop | Flagged events are suggestions for investigation; final decisions remain with the analyst |
+| Confidence gating | `add_flagged()` in [confidence_gating.py](confidence_gating.py) requires both low anomaly score and `strong_indicator()` — reduces false-positive alert fatigue |
+| Explainability | 12 interpretable features plus template-based explanations — not a black-box-only alert |
+| Upload validation | Extension whitelist (`.csv`, `.parquet`); required columns; timestamp/pid/ppid type checks; `st.stop()` on invalid input in [app.py](app.py) |
+| Simulation data only | Public demo uses Splunk Attack Data (T1003.003 simulation) — not live production EDR feeds |
+| No secrets in UI | No API keys or credentials required for the current MVP; pipeline and app run from local/Cloud env only |
+| Vendor disclaimer | README + data section: no affiliation with Splunk, CrowdStrike, or commercial EDR vendors |
+| Analyst disclaimer | UI How It Works + README: correlate findings with internal telemetry and context before taking action |
+
+---
+
+## 🔄 CI/CD
+
+GitHub Actions runs on every push and pull request to `main` / `master`:
+
+- **Workflow:** `.github/workflows/tests.yml`
+- **Scope:** 81 offline unit tests (feature engineering, confidence gating, schema normalizers, Falcon NDJSON parsing, Isolation Forest helpers, upload validation, pipeline smoke)
+- **API keys required:** **None** — CI does not call external APIs or require EDR credentials
+- **Python versions:** 3.11 and 3.12 on `ubuntu-latest`
+
+This is a **CI pipeline** for regression safety; **CD** (continuous deployment) is handled by Streamlit Cloud on merge to the default branch.
 
 ---
 
 ## 📈 Project Status & Build Log
 
-| Step | Focus |
-|------|--------|
-| 1 | **Data** — Load and unify CrowdStrike Falcon, 4688, and Sysmon logs into a single schema. |
-| 2 | **Features** — Prep events, build 12 interpretable features, heuristic labels, EDA, RF importance. |
-| 3 | **Model** — Train Isolation Forest (unsupervised), score events, merge trace columns, save scored parquet. |
-| 4 | **Gating** — Risk levels, strong-indicator logic, flagged flag, explanations, threshold config. |
-| 5 | **UI** — Streamlit dashboard: upload/sample load, filters, sort, table, full command line, CSV download. |
+| Step | Focus | Status |
+|------|-------|--------|
+| 1 | Multi-source log ingest (Falcon, Sysmon, 4688) | ✅ |
+| 2 | Feature engineering — 12 features + heuristic labels | ✅ |
+| 3 | Isolation Forest training + scoring | ✅ |
+| 4 | Confidence gating + explanations + threshold config | ✅ |
+| 5 | Streamlit UI + custom SOC theme | ✅ |
+| 6 | Upload validation + friendly error UX | ✅ |
+| 7 | Sample parquet workflow + reproducible artifacts | ✅ |
+| 8 | Streamlit Cloud deploy | ✅ |
+| 9 | Offline tests + GitHub Actions CI | ✅ |
+
+**Current status:** ✅ MVP complete — live on Streamlit Cloud with GitHub Actions CI.
+
+---
+
+## 📁 Repository Layout
+
+```
+├── app.py                      # Streamlit UI — upload, filters, triage, export
+├── load_events.py              # CLI: combine multi-source logs into unified events
+├── feature_engineering.py      # Prep, 12 features, heuristic labels, EDA, RF importance
+├── train_isolation_forest.py   # Train Isolation Forest, score events, evaluation plots
+├── confidence_gating.py        # Risk levels, gating, explanations, threshold JSON
+├── loaders/                    # Per-format parsers + unified schema
+│   ├── falcon.py               # CrowdStrike Falcon NDJSON
+│   ├── sysmon.py               # Sysmon XML (events 1/8/10)
+│   ├── windows_security_4688.py
+│   └── schema.py               # Unified column mapping
+├── output/                     # Pipeline artifacts (parquet, threshold_config.json)
+├── data/                       # Raw attack simulation logs (gitignored; download separately)
+├── requirements.txt            # Python dependencies
+├── LICENSE                     # MIT License
+├── README.md                   # Project overview (this file)
+├── requirements-dev.txt        # Dev deps (pytest) for CI and local testing
+├── pytest.ini                  # Pytest configuration
+├── tests/                      # Offline unit + integration tests
+│   ├── conftest.py
+│   ├── test_app_validation.py
+│   ├── test_confidence_gating.py
+│   ├── test_feature_engineering.py
+│   ├── test_falcon_loader.py
+│   ├── test_isolation_forest.py
+│   ├── test_pipeline_integration.py
+│   └── test_schema.py
+├── .github/workflows/tests.yml # GitHub Actions CI
+└── docs/screenshots/           # README demo images 
+```
 
 ---
 
 ## 📄 License
 
-This codebase is offered under the **MIT License**. Dataset attribution and license (Splunk Attack Data, Apache 2.0) are described in the Data Sources section above. No affiliation with Splunk or CrowdStrike.
+**MIT License** — see [LICENSE](LICENSE). Dataset attribution and license (Splunk Attack Data, Apache 2.0) are described in the Data Sources section above. No affiliation with Splunk or CrowdStrike.
 
 ---
 
@@ -149,5 +299,3 @@ Open to feedback, suggestions, and mission-aligned collaboration.
 - Real-time ingestion from live EDR feeds (e.g., via Kafka or file watcher)
 - Integration of lightweight LLM-based summarization for flagged events
 - Applying the same pipeline to additional MITRE ATT&CK techniques (process injection T1055, elevation of privilege T1548, etc.)
-
-
