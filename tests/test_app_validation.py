@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from app import _ensure_risk_and_flagged, _normalize_schema, load_uploaded_file
+from app import _ensure_risk_and_flagged, _flagged_events, _normalize_schema, load_uploaded_file
 
 
 def _valid_csv_bytes() -> bytes:
@@ -58,6 +58,24 @@ class TestEnsureRiskAndFlagged:
         df = pd.DataFrame({"risk_level": ["Normal"]})
         out = _ensure_risk_and_flagged(df)
         assert out["explanation"].iloc[0] == ""
+
+
+class TestFlaggedEvents:
+    def test_prefers_confidence_gated_column_over_risk_band(self):
+        df = pd.DataFrame(
+            {
+                "risk_level": ["Critical", "Critical", "Normal"],
+                "flagged": [True, False, False],
+            }
+        )
+        out = _flagged_events(df)
+        assert len(out) == 1
+        assert bool(out.iloc[0]["flagged"])
+
+    def test_falls_back_to_risk_level_when_no_flagged_column(self):
+        df = pd.DataFrame({"risk_level": ["Critical", "Normal", "High"]})
+        out = _flagged_events(df)
+        assert len(out) == 2
 
 
 class TestLoadUploadedFile:

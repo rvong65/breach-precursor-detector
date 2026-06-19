@@ -1,0 +1,23 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./output:/app/output:ro
+    restart: unless-stopped
+
+  pipeline:
+    profiles:
+      - pipeline
+    build: .
+    volumes:
+      - ./data:/app/data:ro
+      - ./output:/app/output
+    command: >
+      sh -c "
+        python load_events.py --data-dir data &&
+        python feature_engineering.py --data-dir data --output-dir output &&
+        python train_isolation_forest.py --x-path output/X_features.parquet --output-dir output &&
+        python confidence_gating.py --scored-path output/scored_events.parquet --x-path output/X_features.parquet --output-dir output
+      "

@@ -6,8 +6,8 @@ applies confidence gating (flag only when score < threshold AND strong indicator
 adds human-readable explanations for flagged events, evaluates vs heuristic labels,
 saves gated DF and threshold config.
 
-For true feature-level importance per event, consider SHAP (e.g. TreeExplainer)
-or LIME; optional if time permits.
+For feature-level importance per event, SHAP TreeExplainer is used in explainability.py
+(wired from this module when --model-path is present).
 """
 
 import argparse
@@ -218,12 +218,15 @@ def save_config(
     output_dir: Path,
     score_threshold: float,
     risk_percentiles: dict[str, float],
+    *,
+    shap_enabled: bool = False,
 ) -> None:
     """Write threshold_config.json."""
     config = {
         "score_threshold": score_threshold,
         "risk_level_bounds": risk_percentiles,
         "strong_indicator_definition": "suspicious_parent == 1 OR dump_precursor == 1 OR hidden_flags >= 2",
+        "shap_enabled": shap_enabled,
     }
     path = Path(output_dir) / "threshold_config.json"
     with open(path, "w") as f:
@@ -239,6 +242,17 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument("--score-threshold", type=float, default=None, help="Fixed threshold; if omitted, use 5th percentile")
     parser.add_argument("--top-n", type=int, default=20)
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        default=Path("output/isolation_forest_model.pkl"),
+        help="Isolation Forest model for optional SHAP feature attribution",
+    )
+    parser.add_argument(
+        "--no-shap",
+        action="store_true",
+        help="Skip SHAP feature attribution even if model exists",
+    )
     args = parser.parse_args()
 
     print("Loading scored events and features...")
@@ -254,12 +268,27 @@ def main() -> None:
     df, score_threshold = add_flagged(df, score_threshold=args.score_threshold)
     df = add_explanations(df)
 
+    shap_enabled = False
+    if not args.no_shap and args.model_path.exists():
+        from explainability import append_shap_to_explanations
+
+        before = df.loc[df["flagged"], "explanation"].head(1).tolist() if df["flagged"].any() else []
+        df = append_shap_to_explanations(df, args.model_path)
+        after = df.loc[df["flagged"], "explanation"].head(1).tolist() if df["flagged"].any() else []
+        shap_enabled = before != after or any(
+            "Top features:" in str(e) for e in df.loc[df["flagged"], "explanation"]
+        )
+        if shap_enabled:
+            print("SHAP feature attribution appended to flagged explanations.")
+    elif not args.no_shap:
+        print(f"SHAP skipped: model not found at {args.model_path}")
+
     print("\n--- Threshold choices ---")
     print(f"  Score threshold (gating): {score_threshold:.4f}")
     print(f"  Risk level bounds (percentiles): {DEFAULT_RISK_PERCENTILES}")
 
     evaluate_gated(df, y_true, args.output_dir, top_n=args.top_n)
-    save_config(args.output_dir, score_threshold, DEFAULT_RISK_PERCENTILES)
+    save_config(args.output_dir, score_threshold, DEFAULT_RISK_PERCENTILES, shap_enabled=shap_enabled)
 
     out_path = args.output_dir / "scored_events_gated.parquet"
     df.to_parquet(out_path, index=True)

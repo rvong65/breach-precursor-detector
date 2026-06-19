@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 80" role="img" aria-label="Breach Precursor Detector">
+  <defs>
+    <linearGradient id="bp-shield-lg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon mark: 72×72 at (4, 4) -->
+  <g transform="translate(4, 4) scale(1.125)">
+    <rect width="64" height="64" rx="14" fill="#0f172a"/>
+    <path d="M32 10 L47 17.5 V31 C47 41.5 32 50 32 50 C32 50 17 41.5 17 31 V17.5 Z"
+          fill="none" stroke="url(#bp-shield-lg)" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M21 35.5 A16 16 0 0 1 43 35.5" fill="none" stroke="#0ea5e9" stroke-width="2"
+          stroke-linecap="round" opacity="0.85"/>
+    <line x1="32" y1="35.5" x2="39" y2="28.5" stroke="#38bdf8" stroke-width="1.75" stroke-linecap="round"/>
+    <circle cx="39" cy="28.5" r="3" fill="#f97373"/>
+    <circle cx="39" cy="28.5" r="6.5" fill="none" stroke="#f97373" stroke-width="1.25" opacity="0.45"/>
+  </g>
+  <!-- Wordmark (dark text for light README / GitHub backgrounds) -->
+  <text x="88" y="34" fill="#0f172a" font-family="Segoe UI, system-ui, sans-serif" font-size="24" font-weight="700">
+    Breach Precursor
+  </text>
+  <text x="88" y="58" fill="#475569" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="500">
+    Detector
+  </text>
+</svg>

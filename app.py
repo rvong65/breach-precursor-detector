@@ -19,9 +19,24 @@ import streamlit as st
 # Sample data path (relative to project root)
 SAMPLE_PARQUET = Path("output/scored_events_gated.parquet")
 THRESHOLD_CONFIG = Path("output/threshold_config.json")
+ASSETS_DIR = Path("assets")
+ICON_SVG = ASSETS_DIR / "icon.svg"
+FAVICON_PNG = ASSETS_DIR / "favicon.png"
 TRUNCATE_CMD = 80
 RISK_ORDER = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3, "Normal": 4}
 REQUIRED_COLS = ["timestamp", "risk_level", "process_image", "parent_image", "command_line", "explanation", "anomaly_score"]
+
+
+def _inline_svg_img(path: Path, width: int, height: int, css_class: str = "") -> str:
+    """Embed a local SVG as a data URI for use in st.markdown HTML."""
+    if not path.exists():
+        return ""
+    svg = path.read_text(encoding="utf-8")
+    import base64
+
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    cls = f' class="{css_class}"' if css_class else ""
+    return f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" height="{height}" alt=""{cls}/>'
 
 
 def inject_css() -> None:
@@ -97,6 +112,18 @@ def inject_css() -> None:
         section[data-testid="stSidebar"] .stMarkdown {
             color: #e5e7eb !important;
         }
+        /* Inline code in sidebar markdown (How it works) – dark chip, light text */
+        section[data-testid="stSidebar"] code,
+        section[data-testid="stSidebar"] .stMarkdown code,
+        [data-testid="stExpander"] .streamlit-expanderContent code,
+        [data-testid="stExpander"] .streamlit-expanderContent .stMarkdown code {
+            background-color: #1f2937 !important;
+            color: #7dd3fc !important;
+            padding: 0.12rem 0.4rem;
+            border-radius: 0.25rem;
+            border: 1px solid #374151;
+            font-size: 0.88em;
+        }
 
         /* Summary metrics – card background and readable text */
         div[data-testid="stMetric"] {
@@ -153,7 +180,7 @@ def inject_css() -> None:
             margin-bottom: 0.5rem;
         }
         .bp-header-title { display: flex; align-items: center; gap: 0.75rem; }
-        .bp-header-icon { font-size: 1.6rem; }
+        .bp-header-icon { width: 2.25rem; height: 2.25rem; flex-shrink: 0; }
         .bp-header-text h1 { font-size: 1.4rem; margin: 0; color: #e5e7eb; }
         .bp-header-text p { margin: 0.15rem 0 0 0; font-size: 0.95rem; color: #9ca3af; }
 
@@ -378,6 +405,15 @@ def _ensure_risk_and_flagged(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _flagged_events(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows shown as alerts: confidence-gated flagged when present, else risk band fallback."""
+    if "flagged" in df.columns:
+        return df[df["flagged"].fillna(False).astype(bool)]
+    if "risk_level" in df.columns:
+        return df[df["risk_level"] != "Normal"]
+    return df.iloc[0:0]
+
+
 @st.cache_data(ttl=300)
 def load_uploaded_file(file_name: str, file_size: int, content: bytes) -> Optional[pd.DataFrame]:
     """Load parquet or csv from bytes; return normalized DataFrame or None on structural issues."""
@@ -450,16 +486,18 @@ def init_session_state():
 
 
 def main():
-    st.set_page_config(page_title="Breach Precursor Detector", layout="wide")
+    page_icon = str(FAVICON_PNG) if FAVICON_PNG.exists() else "🛡️"
+    st.set_page_config(page_title="Breach Precursor Detector", page_icon=page_icon, layout="wide")
     init_session_state()
 
     inject_css()
 
+    logo_img = _inline_svg_img(ICON_SVG, 36, 36, "bp-header-icon")
     st.markdown(
-        """
+        f"""
         <div class="bp-header">
           <div class="bp-header-title">
-            <div class="bp-header-icon">🛡️</div>
+            <div class="bp-header-icon">{logo_img or "🛡️"}</div>
             <div class="bp-header-text">
               <h1>Breach Precursor Detector</h1>
               <p>Early indicators of process injection and credential access.</p>
@@ -479,8 +517,10 @@ def main():
                 "and optionally risk level and explanation."
             )
             st.markdown(
-                "**What you see:** The app shows **flagged events only** (risk_level not Normal) in the main table. "
-                "You can filter by risk level and keyword, and sort by score, time, or risk."
+                "**What you see:** The main table shows **confidence-gated alerts** only — events the pipeline marked "
+                "with `flagged == true` (low anomaly score **and** a strong domain indicator such as dump precursor or "
+                "suspicious parent). **Medium** and **Low** risk-band events may still appear in sidebar charts but are "
+                "excluded from the alert table unless they pass gating. Filter by risk level and keyword; sort by score, time, or risk."
             )
             st.markdown(
                 "**Sidebar:** Totals (events, flagged count, % flagged), top 3 riskiest process images and parent images by count of flagged events, "
@@ -549,13 +589,13 @@ def main():
         df = st.session_state.df
         if df is not None:
             total = len(df)
-            flagged = (df["risk_level"] != "Normal").sum() if "risk_level" in df.columns else (df["flagged"].sum() if "flagged" in df.columns else 0)
+            flagged_df = _flagged_events(df)
+            flagged = len(flagged_df)
             pct = 100 * flagged / total if total else 0
             m1, m2, m3 = st.columns(3)
             m1.metric("Total events", total)
             m2.metric("Flagged", flagged)
             m3.metric("% flagged", f"{pct:.1f}%")
-            flagged_df = df[df["risk_level"] != "Normal"] if "risk_level" in df.columns else (df[df["flagged"]] if "flagged" in df.columns else df.iloc[0:0])
             if not flagged_df.empty:
                 top_img_s = flagged_df["process_image"].value_counts().head(3) if "process_image" in flagged_df.columns else pd.Series(dtype=int)
                 top_parent_s = flagged_df["parent_image"].value_counts().head(3) if "parent_image" in flagged_df.columns else pd.Series(dtype=int)
@@ -616,13 +656,10 @@ def main():
     if "timestamp" not in df.columns and "process_image" not in df.columns:
         st.warning("File is missing expected columns; display may be incomplete.")
 
-    # Flagged only
-    if "risk_level" in df.columns:
-        df_main = df[df["risk_level"] != "Normal"].copy()
-    else:
-        df_main = df[df.get("flagged", False)].copy()
+    # Confidence-gated alerts (or risk-band fallback for uploads without flagged column)
+    df_main = _flagged_events(df).copy()
     if df_main.empty:
-        st.info("No flagged events (risk_level != Normal).")
+        st.info("No flagged events (confidence-gated alerts).")
         return
 
     # Filters

@@ -26,3 +26,11 @@ data/
 # Manual upload QA fixtures (local only — CI uses in-memory invalid inputs)
 # -----------------------------------------------------------------------------
 tests/broken_files/
+
+# -----------------------------------------------------------------------------
+# Pipeline output — commit sample/runtime artifacts only (see README)
+# -----------------------------------------------------------------------------
+output/*
+!output/scored_events_gated.parquet
+!output/threshold_config.json
+!output/isolation_forest_model.pkl

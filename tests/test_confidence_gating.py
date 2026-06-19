@@ -158,3 +158,4 @@ class TestSaveConfig:
         assert data["score_threshold"] == 0.05
         assert "risk_level_bounds" in data
         assert "strong_indicator_definition" in data
+        assert data.get("shap_enabled") is False

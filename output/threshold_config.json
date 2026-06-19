@@ -6,5 +6,6 @@
     "Medium": 0.1,
     "Low": 0.2
   },
-  "strong_indicator_definition": "suspicious_parent == 1 OR dump_precursor == 1 OR hidden_flags >= 2"
+  "strong_indicator_definition": "suspicious_parent == 1 OR dump_precursor == 1 OR hidden_flags >= 2",
+  "shap_enabled": true
 }
