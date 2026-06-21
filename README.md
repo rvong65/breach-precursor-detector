@@ -198,8 +198,8 @@ This project uses curated attack simulation logs from the [Splunk Attack Data re
 
 | Version | Highlights | Release |
 |---------|------------|---------|
-| **v1.1.0** | SHAP explainability, Docker support, CI Docker build (92 tests) | [Releases](https://github.com/rvong65/breach-precursor-detector/releases) |
-| **v1.0.0** | MVP — Isolation Forest pipeline, Streamlit app, CI (81 tests) | [Releases](https://github.com/rvong65/breach-precursor-detector/releases) |
+| **v1.1.0** | SHAP explainability, Docker support, CI Docker build (92 tests) | [Releases](https://github.com/rvong65/breach-precursor-detector/releases) · [CHANGELOG](CHANGELOG.md#110---2026-06-19) |
+| **v1.0.0** | MVP — Isolation Forest pipeline, Streamlit app, CI (81 tests) | [Releases](https://github.com/rvong65/breach-precursor-detector/releases) · [CHANGELOG](CHANGELOG.md#100---2026-06-18) |
 
 ---
 
@@ -406,6 +406,7 @@ All tests run offline with in-memory fixtures; no raw log files, `data/` directo
 ├── requirements.txt            # Python dependencies
 ├── requirements-dev.txt        # Dev deps (pytest) for CI and local testing
 ├── pytest.ini                  # Pytest configuration
+├── CHANGELOG.md                # Version-by-version change history
 ├── LICENSE                     # MIT License
 └── README.md                   # Project overview (this file)
 ```
