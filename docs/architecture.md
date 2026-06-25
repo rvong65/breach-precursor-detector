@@ -204,8 +204,18 @@ docker compose --profile pipeline run --rm pipeline   # full batch pipeline
 - **No secrets** — CI and demo run without API keys.
 - **Upload validation** — schema and type checks in `app.py` before display.
 
+### Privacy & data handling
+
+| Concern | Behavior |
+|---------|----------|
+| Third-party APIs | **None** in app or batch pipeline — no LLM, cloud ML, or analytics SDK calls |
+| User uploads (Streamlit) | Parsed in-memory for display/filter/export; **not** re-scored or persisted by this codebase |
+| SHAP | Batch-time only during `confidence_gating.py`; sample parquet ships pre-computed explanations |
+| Local / Docker | Processing stays on the user's machine or container |
+| Streamlit Cloud | Hosted session on Streamlit infrastructure — see [Streamlit privacy policy](https://streamlit.io/privacy) before uploading sensitive logs |
+
 ---
 
 ## Version
 
-Document reflects **v1.1.0** (SHAP, Docker, CI Docker build). See [README → Version history](../README.md#version-history).
+Document reflects **v1.1.1** (privacy documentation). See [README → Version history](../README.md#version-history).

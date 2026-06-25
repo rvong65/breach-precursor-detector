@@ -6,6 +6,8 @@
 [![Release](https://img.shields.io/github/v/release/rvong65/breach-precursor-detector?label=release)](https://github.com/rvong65/breach-precursor-detector/releases)
 [![CI](https://github.com/rvong65/breach-precursor-detector/actions/workflows/tests.yml/badge.svg)](https://github.com/rvong65/breach-precursor-detector/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Explainability](https://img.shields.io/badge/Explainability-SHAP%20%2B%20rules-EE4C2C?style=flat-square)](https://github.com/rvong65/breach-precursor-detector#features)
+[![Deploy](https://img.shields.io/badge/Deploy-Docker%20%7C%20local-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/rvong65/breach-precursor-detector#run-with-docker)
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://breach-precursor-detector.streamlit.app/)
 
 Early behavioral precursors to credential dumping and process injection often evade signature-based detection. This project uses unsupervised anomaly detection (Isolation Forest) on interpretable process features, confidence gating, rule-based and SHAP-augmented explanations to surface high-signal events—inspired by CrowdStrike-style EDR telemetry and the need for actionable, low-false-positive alerts in SOC workflows.
@@ -30,7 +32,7 @@ Early behavioral precursors to credential dumping and process injection often ev
 | 🏗️ [Architecture & Design Choices](#architecture-design-choices) | System design and pipeline |
 | ↳ [Full architecture doc](docs/architecture.md) | Detailed system design (Mermaid) |
 | ↳ [Development Journey](#development-journey) | Build timeline diagram |
-| 🛡️ [Safety Considerations](#safety-considerations) | Ethics and guardrails |
+| 🛡️ [Safety Considerations](#safety-considerations) | Ethics, guardrails, and data privacy |
 | 🔄 [CI/CD](#cicd) | GitHub Actions and deployment |
 | 📈 [Project Status & Build Log](#project-status) | Milestone checklist |
 | 📁 [Repository Layout](#repository-layout) | File tree |
@@ -50,6 +52,7 @@ Early behavioral precursors to credential dumping and process injection often ev
 
 **Before you open the app:**
 - **Cold start:** This app runs on Streamlit Community Cloud and may go to sleep after inactivity. If you see **“Zzzz — This app has gone to sleep due to inactivity”**, click **“Yes, get this app back up!”** to wake it — anyone can do this; you don’t need to contact the maintainer. Startup may take a minute after you click.
+- **Privacy:** This app does **not** call third-party APIs (no LLMs, cloud ML, or analytics SDKs). Uploads are processed in your session for triage only — not re-scored or forwarded elsewhere by this codebase. On Streamlit Cloud, files are handled on [Streamlit’s infrastructure](https://streamlit.io/privacy); use **local** or **Docker** for sensitive logs. See [Privacy & data handling](#privacy-data-handling).
 - **Display:** The app looks best in **light mode**. If text is hard to read in dark mode, switch your browser/system theme or use Streamlit’s theme selector in the top-right menu. This is a known rendering quirk we're working on improving.
 
 **Run locally:**  
@@ -119,6 +122,8 @@ pytest tests/ -q
 ```
 
 **Run with Docker**
+
+<a id="run-with-docker"></a>
 
 ```bash
 docker compose up --build
@@ -198,6 +203,7 @@ This project uses curated attack simulation logs from the [Splunk Attack Data re
 
 | Version | Highlights | Release |
 |---------|------------|---------|
+| **v1.1.1** | Privacy & data-handling documentation | [Releases](https://github.com/rvong65/breach-precursor-detector/releases) · [CHANGELOG](CHANGELOG.md#111---2026-06-25) |
 | **v1.1.0** | SHAP explainability, Docker support, CI Docker build (92 tests) | [Releases](https://github.com/rvong65/breach-precursor-detector/releases) · [CHANGELOG](CHANGELOG.md#110---2026-06-19) |
 | **v1.0.0** | MVP — Isolation Forest pipeline, Streamlit app, CI (81 tests) | [Releases](https://github.com/rvong65/breach-precursor-detector/releases) · [CHANGELOG](CHANGELOG.md#100---2026-06-18) |
 
@@ -329,6 +335,25 @@ flowchart LR
 | Vendor disclaimer | No affiliation with Splunk, CrowdStrike, or commercial EDR vendors |
 | Analyst disclaimer | UI How It Works + README: correlate findings with internal telemetry and context before taking action |
 
+<a id="privacy-data-handling"></a>
+
+### Privacy & data handling
+
+This app is **read-only triage** — it does not send your files to LLM providers, external scoring APIs, or analytics services. There are **no API keys** in the UI or pipeline.
+
+| Data you submit | Where it is processed | Sent to third-party APIs by this app? |
+|-----------------|----------------------|---------------------------------------|
+| **Load sample data** | In-memory from bundled parquet | **No** |
+| **Upload parquet/csv** | In-memory in your Streamlit session (display, filter, export) | **No** — uploads are not re-scored, stored in a project database, or forwarded elsewhere by this codebase |
+| **CSV / config export** | Downloaded to your browser | **No** |
+| **Batch pipeline** (local/Docker CLI) | Your machine or container | **No** — offline; SHAP runs at gating time, not in the upload UI |
+
+**Deployment notes**
+
+- **Local / Docker:** Data stays on your machine or container unless you choose to export it.
+- **Streamlit Cloud demo:** The hosted app runs on [Streamlit Community Cloud](https://streamlit.io/cloud). Uploads are processed on Streamlit’s infrastructure during your session — review [Streamlit’s privacy policy](https://streamlit.io/privacy) before uploading production or sensitive EDR logs.
+- **Do not upload** classified, regulated, or production telemetry to the public demo unless your organization permits it.
+
 ---
 
 <a id="cicd"></a>
@@ -366,9 +391,10 @@ All tests run offline with in-memory fixtures; no raw log files, `data/` directo
 | 7 | Sample parquet workflow + reproducible artifacts | ✅ |
 | 8 | Streamlit Cloud deploy | ✅ |
 | 9 | Offline tests + GitHub Actions CI | ✅ |
-| 10 | SHAP explainability + Docker + architecture docs | ✅ |
+| 10 | v1.1 — SHAP explainability + Docker + architecture docs + CHANGELOG | ✅ |
+| 11 | v1.1.1 — Privacy & data disclosures (README + Streamlit sidebar) | ✅ |
 
-**Current status:** v1.1 — live on Streamlit Cloud with CI, Docker, and SHAP-augmented explanations.
+**Current status:** v1.1.1 — live on Streamlit Cloud with CI, Docker, SHAP-augmented explanations, and documented privacy/data handling.
 
 ---
 

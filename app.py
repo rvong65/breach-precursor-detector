@@ -530,6 +530,11 @@ def main():
                 "**Export:** Download the filtered flagged events as CSV and (if available) the threshold config for reproducibility."
             )
             st.markdown(
+                "**Privacy:** This app does not call third-party APIs (no LLMs, cloud ML, or analytics). "
+                "Uploads are processed in your session for triage only — not re-scored or sent elsewhere by this app. "
+                "On Streamlit Cloud, files are handled on Streamlit's host; use local or Docker for sensitive logs."
+            )
+            st.markdown(
                 "Chart toolbars may show light icons (Streamlit limitation)."
             )
         st.subheader("Data")

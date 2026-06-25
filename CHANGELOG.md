@@ -6,6 +6,13 @@ Release dates reflect when a version was **tagged on GitHub** (Release), not whe
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-25
+
+### Added
+
+- **Privacy & data** disclosures in README (Safety section), architecture docs, and Streamlit sidebar expander (How it works)
+- Live Demo privacy note for public Streamlit Cloud demo
+
 ## [1.1.0] - 2026-06-19
 
 ### Added
@@ -49,6 +56,7 @@ First **tagged** release (June 2026). The repo and Streamlit app were already **
 - Streamlit Cloud deployment
 - README with architecture overview, quick start, data attribution, and safety considerations
 
-[Unreleased]: https://github.com/rvong65/breach-precursor-detector/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/rvong65/breach-precursor-detector/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/rvong65/breach-precursor-detector/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/rvong65/breach-precursor-detector/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/rvong65/breach-precursor-detector/releases/tag/v1.0.0
